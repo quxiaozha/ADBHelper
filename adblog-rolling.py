@@ -22,7 +22,8 @@ def exe_cmd_and_save_to_file(cmd, destination, start_time, duration, logger_name
                 start_time += datetime.timedelta(seconds=duration)
                 log_dir = os.path.join(destination, str(start_time))
                 os.makedirs(log_dir, exist_ok=True)
-                log_file_path = os.path.join(log_dir, f'{logger_name}-{start_time}.log')
+                log_file_path = os.path.join(
+                    log_dir, f'{logger_name}-{start_time}.log')
                 logfile.close()
                 logfile = open(log_file_path, 'a')
 
@@ -30,8 +31,6 @@ def exe_cmd_and_save_to_file(cmd, destination, start_time, duration, logger_name
             logfile.flush()
 
 
-# TODO
-# use threading to replace _thread
 def execute_command_and_save_to_file(cmd, destination, start_time, duration, logger_name, exit_event):
     res = os.system(cmd)
     if res != 0:
@@ -39,7 +38,9 @@ def execute_command_and_save_to_file(cmd, destination, start_time, duration, log
 
     with exit_event:
         while not exit_event.is_set():
-            exe_cmd_and_save_to_file(cmd, destination, start_time, duration, logger_name)
+            exe_cmd_and_save_to_file(
+                cmd, destination, start_time, duration, logger_name)
+
 
 def main():
     res = os.system('adb logcat -c')
@@ -68,6 +69,7 @@ def main():
         exit_event2.set()
         thread1.join()
         thread2.join()
+
 
 if __name__ == '__main__':
     main()
