@@ -4,13 +4,19 @@ import time
 import os
 
 def worker(q, worker_id):
+    f = None
     while True:
         dir_path = q.get()
         if dir_path is None:
+            if f is not None:
+                f.close()
             break
+        if f is not None:
+            f.close()
         log_file = os.path.join(dir_path, f'log_{worker_id}.txt')
-        with open(log_file, 'a') as f:
-            f.write(f"Worker {worker_id} writing to {log_file}\n")
+        f = open(log_file, 'a')
+        f.write(f"Worker {worker_id} writing to {log_file}\n")
+        f.flush()
         time.sleep(3)
 
 def main():
