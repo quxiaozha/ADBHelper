@@ -1,86 +1,58 @@
-import datetime
 import os
 import threading
 import time
 
+class SharedDirPath:
+    def __init__(self):
+        self.dir_path = None
 
-def exe_cmd_and_save_to_file(cmd, destination, start_time, duration, logger_name):
-    log_dir = os.path.join(destination, str(start_time))
-    os.makedirs(log_dir, exist_ok=True)
-    log_file_path = os.path.join(log_dir, f'{logger_name}-{start_time}.log')
+    def set_dir_path(self, dir_path):
+        self.dir_path = dir_path
 
-    print(start_time)
+    def get_dir_path(self):
+        return self.dir_path
 
-    with os.popen(cmd, "r") as rf, open(log_file_path, 'a') as logfile:
+def worker(shared_dir_path, worker_id):
+    f = None
+    with os.popen("ping baidu.com", "r") as rf:
         while True:
+            dir_path = shared_dir_path.get_dir_path()
+            os.makedirs(dir_path, exist_ok=True)
+            print(f"Worker {worker_id} dir_path: {dir_path}")
+            if dir_path is not None and (f is None or not f.name.startswith(dir_path)):
+                if f is not None:
+                    f.close()
+                log_file = os.path.join(dir_path, f'log_{worker_id}.txt')
+                f = open(log_file, 'a')
+            print(f"Worker {worker_id} reading...")
             line = rf.readline()
+            print(f"Worker {worker_id} read: {line}")
             if not line:
+                if f is not None:
+                    f.close()
                 break
-
-            elapsed_time = (datetime.datetime.now() - start_time).seconds
-            if elapsed_time >= duration:
-                start_time += datetime.timedelta(seconds=duration)
-                log_dir = os.path.join(destination, str(start_time))
-                os.makedirs(log_dir, exist_ok=True)
-                log_file_path = os.path.join(
-                    log_dir, f'{logger_name}-{start_time}.log')
-                logfile.close()
-                logfile = open(log_file_path, 'a')
-
-            logfile.write(line)
-            logfile.flush()
-
-
-def execute_command_and_save_to_file(cmd, destination, start_time, duration, logger_name, exit_event):
-    res = os.system(cmd)
-    if res != 0:
-        print(f"Command '{cmd}' failed with exit code {res}")
-
-    with exit_event:
-        while not exit_event.is_set():
-            exe_cmd_and_save_to_file(
-                cmd, destination, start_time, duration, logger_name)
-
+            if f is not None:
+                print(f"Worker {worker_id} writing: {line}")
+                f.write(f"Worker {worker_id} writing: {line}")
+                f.flush()
 
 def main():
-    res = os.system('adb logcat -c')
-    if res != 0:
-        print("Failed to clear logcat buffer")
+    shared_dir_path = SharedDirPath()
+    workers = []
+    for i in range(2):  # Start 2 workers
+        t = threading.Thread(target=worker, args=(shared_dir_path, i))
+        t.start()
+        workers.append(t)
 
-    start_time = datetime.datetime.now()
-    base_dir = str(start_time) + '-all-logs'
+    # Update dir_path in the main thread
+    shared_dir_path.set_dir_path('./dir1')
+    # ... do some work ...
+    time.sleep(5)
+    shared_dir_path.set_dir_path('./dir2')
 
-    exit_event1 = threading.Event()
-    thread1 = threading.Thread(target=execute_command_and_save_to_file,
-                               args=('adb logcat -s GnssLocationProvider', base_dir, start_time, 5, 'Gns', exit_event1))
+    # Wait for all workers to finish
+    for t in workers:
+        t.join()
 
-    exit_event2 = threading.Event()
-    thread2 = threading.Thread(target=execute_command_and_save_to_file,
-                               args=('adb logcat -s OpenGLRenderer', base_dir, start_time, 5, 'OGL', exit_event2))
-
-    thread1.start()
-    thread2.start()
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        exit_event1.set()
-        exit_event2.set()
-        thread1.join()
-        thread2.join()
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-# if __name__ == '__main__':
-#     res = os.system('adb logcat -c')
-#     startTime = datetime.datetime.now()
-#     baseDir = str(startTime) + '-all-logs'
-#     _thread.start_new_thread(exe_cmd_and_save_to_file,
-#                              ('adb logcat -s GnssLocationProvider', baseDir, startTime, 5, 'Gns'))
-#     _thread.start_new_thread(exe_cmd_and_save_to_file,
-#                              ('adb logcat -s OpenGLRenderer', baseDir, startTime, 5, 'OGL'))
-#     while 1:
-#         pass
